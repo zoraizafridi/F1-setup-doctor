@@ -3,8 +3,9 @@ from uuid import uuid4
 
 import streamlit as st
 
+from car import NAMES, car_svg, parts_for
 from engine import diagnose
-from questions import COMMON, QUESTIONS, SCENARIOS
+from questions import COMMON, QUESTIONS, READINGS, SCENARIOS, TRACKS
 from rules import RULES
 
 STYLE = """
@@ -88,6 +89,10 @@ STYLE = """
 [data-testid="stSelectbox"] input { color: #e9eef6 !important; -webkit-text-fill-color: #e9eef6 !important; }
 [data-testid="stSelectbox"] svg { fill: #93a0b4 !important; color: #93a0b4 !important; }
 
+[data-testid="stSlider"] [role="slider"] { background-color: #ff8a1f !important; }
+[data-testid="stSliderThumbValue"], [data-testid="stSliderThumbValue"] * { color: #ff8a1f !important; }
+[data-testid="stSliderTickBarMin"], [data-testid="stSliderTickBarMax"] { color: #93a0b4 !important; }
+
 [data-testid="stRadioOption"] > div > div:first-child {
     border: 2px solid #3a4860 !important;
     background: #0f1520 !important;
@@ -165,6 +170,27 @@ button[data-testid="stBaseButton-primary"] * { color: #1a0f00 !important; font-w
 .meter-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #ff8a1f, #ffc062); }
 .meter p { margin: 0; color: #b4bfcf !important; line-height: 1.5; }
 
+.chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.3rem 0 1rem 0; }
+.chip {
+    padding: 0.25rem 0.8rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 138, 31, 0.45);
+    background: rgba(255, 138, 31, 0.10);
+    color: #ffc062 !important;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.car { max-width: 220px; margin: 0 auto; }
+.car svg { display: block; width: 100%; height: auto; }
+.car .off { fill: #1b2536; stroke: #3a4860; stroke-width: 1.5; }
+.car .on {
+    fill: #ff8a1f;
+    stroke: #ffc062;
+    stroke-width: 1.5;
+    filter: drop-shadow(0 0 5px rgba(255, 138, 31, 0.9));
+}
+
 </style>
 """
 
@@ -184,11 +210,24 @@ def strength(cf):
     return "worth trying"
 
 
+def chips(facts):
+    shown = [pretty(k) if v == "yes" else pretty(v) for k, v in facts.items() if v not in ("no", "not sure")]
+    return '<div class="chips">' + "".join(f'<span class="chip">{label}</span>' for label in shown) + "</div>"
+
+
 def ask(text, options, key):
     choices = ["not sure"] + options
     if len(choices) > 4:
         return st.selectbox(text, choices, format_func=pretty, key=key)
     return st.radio(text, choices, horizontal=True, format_func=pretty, key=key)
+
+
+def reading(name, key):
+    label, low, high, default, limit = READINGS[name]
+    value = st.slider(label, low, high, default, key=key)
+    fact = "yes" if value > limit else "no"
+    st.caption(f"Derived fact: {pretty(name)} = {fact} ({value} °C against a limit of {limit} °C)")
+    return fact
 
 
 def build_sheet(facts, accepted, fired):
@@ -229,6 +268,7 @@ def show_report(report, prefix):
         "and the changes waiting for your approval."
     )
     st.caption(f"{report['label']} \u00b7 {report['id']} \u00b7 {report['time']}")
+    st.markdown(chips(facts), unsafe_allow_html=True)
 
     if ranked:
         summary = (
@@ -257,6 +297,19 @@ def show_report(report, prefix):
 
     st.header(f"{pretty(facts['problem'])} diagnosed")
     st.write(f"The engine examined {answered} observation(s) and fired {len(fired)} rule(s).")
+
+    touched = {}
+    for fix, _ in ranked:
+        for part in parts_for(fix):
+            touched.setdefault(part, []).append(fix)
+    st.subheader("Where to look")
+    left, right = st.columns(2)
+    left.markdown(car_svg(touched), unsafe_allow_html=True)
+    if touched:
+        right.markdown("\n".join(f"- **{NAMES[part]}**: {', '.join(fixes)}" for part, fixes in touched.items()))
+    else:
+        right.write("These changes are about driving technique, not car parts.")
+
     st.subheader("Recommended changes")
     st.caption("Tick the changes you accept to build your setup sheet.")
     accepted = []
@@ -332,14 +385,21 @@ with investigate_tab:
         "Enter what you observed. Not sure means the fact is unknown, "
         "and a rule that needs it will not fire."
     )
+    chip_box = st.container()
     problem = st.selectbox("Main problem", list(QUESTIONS), format_func=pretty)
     facts = {"problem": problem}
     with st.expander(f"{pretty(problem)} details", expanded=True):
         for key, (text, options) in QUESTIONS[problem].items():
-            facts[key] = ask(text, options, f"inv_{problem}_{key}")
+            widget_key = f"inv_{problem}_{key}"
+            facts[key] = reading(key, widget_key) if key in READINGS else ask(text, options, widget_key)
     with st.expander("Track and car conditions", expanded=True):
+        track = st.selectbox("Track", ["Not sure"] + list(TRACKS), key="inv_track")
+        facts["track"] = TRACKS.get(track, "not sure")
+        if track in TRACKS:
+            st.caption(f"Treated as a {pretty(TRACKS[track]).lower()} track.")
         for key, (text, options) in COMMON.items():
             facts[key] = ask(text, options, f"inv_{key}")
+    chip_box.markdown(chips(facts), unsafe_allow_html=True)
     if st.button("Run investigation", type="primary", width="stretch", key="inv_run"):
         st.session_state["inv_report"] = new_report(facts, "Manual investigation")
     if "inv_report" in st.session_state:
@@ -355,7 +415,7 @@ with scenario_tab:
     scenario = SCENARIOS[choice]
     st.subheader(choice)
     st.write(scenario["description"])
-    questions = {**QUESTIONS[scenario["facts"]["problem"]], **COMMON}
+    questions = {**QUESTIONS[scenario["facts"]["problem"]], **COMMON, "track": ("Track type",)}
     with st.expander("Observations in this scenario", expanded=True):
         lines = []
         for key, value in scenario["facts"].items():

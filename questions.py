@@ -52,6 +52,27 @@ COMMON = {
     "fuel": ("What is the fuel load?", ["heavy", "light"]),
 }
 
+# Raw measurements. In Investigate these replace the yes/no question with the
+# same key. A reading above the limit becomes the fact "yes", otherwise "no".
+# key: (slider label, minimum, maximum, default, limit)
+READINGS = {
+    "front_hot": ("Front tyre temperature (°C)", 60, 140, 90, 105),
+    "rear_hot": ("Rear tyre temperature (°C)", 60, 140, 90, 105),
+    "brake_hot": ("Brake disc temperature (°C)", 300, 1100, 600, 800),
+}
+
+TRACKS = {
+    "Monaco": "high_downforce",
+    "Hungaroring": "high_downforce",
+    "Singapore": "high_downforce",
+    "Silverstone": "medium_downforce",
+    "Suzuka": "medium_downforce",
+    "Barcelona": "medium_downforce",
+    "Spa-Francorchamps": "low_downforce",
+    "Monza": "low_downforce",
+    "Baku": "low_downforce",
+}
+
 SCENARIOS = {
     "SCN-01 Understeer at a slow hairpin": {
         "description": "The car pushes wide in the middle of a slow hairpin. The fuel load is heavy and the front tyres are overheating.",
@@ -73,14 +94,15 @@ SCENARIOS = {
         "facts": {"problem": "traction", "speed": "slow", "wheelspin": "yes",
                   "power_snap": "no", "rear_hot": "yes", "weather": "wet", "fuel": "heavy"},
     },
-    "SCN-05 Low top speed on the straights": {
-        "description": "The car is quick through the corners but loses time on the straights.",
+    "SCN-05 Low top speed at Monza": {
+        "description": "The car is quick through the corners but loses time on the long straights of a low-downforce track.",
         "facts": {"problem": "straight", "straight_issue": "low_top_speed",
-                  "corner_grip": "good", "weather": "dry", "fuel": "light"},
+                  "corner_grip": "good", "track": "low_downforce",
+                  "weather": "dry", "fuel": "light"},
     },
-    "SCN-06 Bottoming out over kerbs": {
-        "description": "The floor scrapes the track every time the car rides a kerb.",
+    "SCN-06 Bottoming out over kerbs at Monaco": {
+        "description": "The floor scrapes the track every time the car rides a kerb on a high-downforce street circuit.",
         "facts": {"problem": "kerbs", "kerb_issue": "bottoming",
-                  "weather": "dry", "fuel": "heavy"},
+                  "track": "high_downforce", "weather": "dry", "fuel": "heavy"},
     },
 }
