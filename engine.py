@@ -14,3 +14,18 @@ def diagnose(facts):
             old = results.get(rule["fix"], 0)
             results[rule["fix"]] = combine(old, rule["cf"])
     return results, fired
+
+
+def diagnose_many(fact_sets):
+    results = {}
+    fired = []
+    seen = set()
+    for facts in fact_sets:
+        _, rules_fired = diagnose(facts)
+        for rule in rules_fired:
+            if rule["id"] in seen:
+                continue
+            seen.add(rule["id"])
+            fired.append(rule)
+            results[rule["fix"]] = combine(results.get(rule["fix"], 0), rule["cf"])
+    return results, fired

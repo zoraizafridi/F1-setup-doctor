@@ -52,9 +52,6 @@ COMMON = {
     "fuel": ("What is the fuel load?", ["heavy", "light"]),
 }
 
-# Raw measurements. In Investigate these replace the yes/no question with the
-# same key. A reading above the limit becomes the fact "yes", otherwise "no".
-# key: (slider label, minimum, maximum, default, limit)
 READINGS = {
     "front_hot": ("Front tyre temperature (°C)", 60, 140, 90, 105),
     "rear_hot": ("Rear tyre temperature (°C)", 60, 140, 90, 105),
@@ -65,12 +62,22 @@ TRACKS = {
     "Monaco": "high_downforce",
     "Hungaroring": "high_downforce",
     "Singapore": "high_downforce",
+    "Zandvoort": "high_downforce",
+    "Mexico City": "high_downforce",
     "Silverstone": "medium_downforce",
     "Suzuka": "medium_downforce",
     "Barcelona": "medium_downforce",
+    "Bahrain": "medium_downforce",
+    "Melbourne": "medium_downforce",
+    "Austin": "medium_downforce",
+    "Interlagos": "medium_downforce",
+    "Abu Dhabi": "medium_downforce",
     "Spa-Francorchamps": "low_downforce",
     "Monza": "low_downforce",
     "Baku": "low_downforce",
+    "Montreal": "low_downforce",
+    "Red Bull Ring": "low_downforce",
+    "Jeddah": "low_downforce",
 }
 
 SCENARIOS = {

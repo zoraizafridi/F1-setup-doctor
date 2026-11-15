@@ -4,7 +4,7 @@ from uuid import uuid4
 import streamlit as st
 
 from car import NAMES, car_svg, parts_for
-from engine import diagnose
+from engine import diagnose, diagnose_many
 from questions import COMMON, QUESTIONS, READINGS, SCENARIOS, TRACKS
 from rules import RULES
 
@@ -245,19 +245,26 @@ def build_sheet(facts, accepted, fired):
     return "\n".join(lines)
 
 
-def new_report(facts, label):
+def new_report(facts, label, extra=None):
     now = datetime.now()
+    results, fired = diagnose_many([facts] + (extra or []))
     return {
         "facts": dict(facts),
         "label": label,
         "id": f"INV-{now:%Y%m%d-%H%M%S}-{uuid4().hex[:4].upper()}",
         "time": now.isoformat(timespec="seconds"),
+        "extra": [dict(item) for item in (extra or [])],
+        "results": results,
+        "fired": [dict(rule) for rule in fired],
     }
 
 
 def show_report(report, prefix):
     facts = report["facts"]
-    results, fired = diagnose(facts)
+    if "results" in report:
+        results, fired = report["results"], report["fired"]
+    else:
+        results, fired = diagnose(facts)
     ranked = sorted(results.items(), key=lambda item: item[1], reverse=True)
     answered = sum(1 for key, value in facts.items() if key != "problem" and value != "not sure")
     top = round(ranked[0][1] * 100) if ranked else 0
@@ -268,6 +275,8 @@ def show_report(report, prefix):
         "and the changes waiting for your approval."
     )
     st.caption(f"{report['label']} \u00b7 {report['id']} \u00b7 {report['time']}")
+    if report.get("extra"):
+        st.caption("Also investigated: " + ", ".join(pretty(item["problem"]) for item in report["extra"]))
     st.markdown(chips(facts), unsafe_allow_html=True)
 
     if ranked:
@@ -399,9 +408,28 @@ with investigate_tab:
             st.caption(f"Treated as a {pretty(TRACKS[track]).lower()} track.")
         for key, (text, options) in COMMON.items():
             facts[key] = ask(text, options, f"inv_{key}")
+    second = st.selectbox(
+        "Second problem (optional)",
+        ["None"] + [name for name in QUESTIONS if name != problem],
+        format_func=pretty,
+        key="inv_second",
+    )
+    extra = []
+    if second != "None":
+        extra_facts = {
+            "problem": second,
+            "track": facts["track"],
+            "weather": facts["weather"],
+            "fuel": facts["fuel"],
+        }
+        with st.expander(f"{pretty(second)} details", expanded=True):
+            for key, (text, options) in QUESTIONS[second].items():
+                widget_key = f"inv2_{second}_{key}"
+                extra_facts[key] = reading(key, widget_key) if key in READINGS else ask(text, options, widget_key)
+        extra.append(extra_facts)
     chip_box.markdown(chips(facts), unsafe_allow_html=True)
     if st.button("Run investigation", type="primary", width="stretch", key="inv_run"):
-        st.session_state["inv_report"] = new_report(facts, "Manual investigation")
+        st.session_state["inv_report"] = new_report(facts, "Manual investigation", extra)
     if "inv_report" in st.session_state:
         show_report(st.session_state["inv_report"], "inv")
 
